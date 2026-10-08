@@ -1,0 +1,69 @@
+# FIND engine
+
+A real metasearcher: one query, fanned out concurrently to engines that
+actually still answer in 2026, scraped/parsed, deduplicated by URL, presented
+on one page. The direct descendant of the 2002 JSearch applet in the
+neighbouring `JSearch/` archive — same architecture, live world.
+
+Single file (`find.py`), Python standard library only, no dependencies.
+
+```sh
+python3 find.py            # http://127.0.0.1:8092/
+```
+
+## Service
+
+A systemd user unit keeps it running and starts it at boot:
+
+```sh
+systemctl --user status findengine     # running on 127.0.0.1:8092
+journalctl --user -u findengine -f     # logs
+loginctl show-user $USER -p Linger     # Linger=yes = starts at boot
+```
+
+## Engines
+
+| Engine | How | Notes |
+|---|---|---|
+| Bing | HTML scrape (`li.b_algo`) | works from a plain server fetch today |
+| Marginalia | official public API (`api.marginalia.nu`) | independent web index, no key |
+| Wikipedia | official public API (`/w/api.php`) | no key, designed for this |
+| Stack Overflow | official public API (`api.stackexchange.com`) | no key, 300 req/day/IP |
+| Hacker News | official Algolia public API | no key, designed for this |
+
+Deliberately **not** wired in, because they return bot-challenge pages (or
+redirect walls) to a plain fetch from a server IP as of 2026-10: DuckDuckGo
+(html and lite endpoints both 202), Google (302), Mojeek (JS check page).
+This was verified with real requests before writing the parsers, and is the
+same wall the archive's `README.md` predicted for its 2001-era engines.
+
+**Bing also poisons**: after a few requests it stops erroring and starts
+serving random popular pages instead of the asked-for results. `run_search`
+runs a relevance sanity-check on every engine's response — if no result
+mentions any query term, the engine's slot shows
+`response failed the relevance check … likely a bot-block page` instead of
+garbage results. Do not trust a scraped engine that returns "success".
+
+## Honesty rules
+
+- One engine failing never sinks the others (the 2002 rule). Each engine's
+  outcome — count or error, and its latency — is shown as a chip on the page
+  and in the JSON.
+- Results are deduplicated by normalized URL; the page reports how many were
+  dropped.
+- No cache, no tracking, no ads. One request per engine per query — nothing
+  auto-retries, nothing hammers.
+
+## API
+
+```sh
+curl 'http://127.0.0.1:8091/api/search?q=searxng'
+```
+
+Returns `{query, results[{title,url,snippet,engine}], engines[{engine,count,
+error,ms}], durationMs, duplicatesDropped}`.
+
+## Adding an engine
+
+Write `def search_x(query) -> list[Result]`, add it to `ENGINES`. If it dies,
+its exception becomes that engine's chip text — by construction.
