@@ -26,10 +26,16 @@ loginctl show-user $USER -p Linger     # Linger=yes = starts at boot
 | Engine | How | Notes |
 |---|---|---|
 | Bing | HTML scrape (`li.b_algo`) | works from a plain server fetch today |
+| SearXNG | the local instance's JSON API (`127.0.0.1:8888`) | dozens of engines behind one call; result badges name the upstream |
 | Marginalia | official public API (`api.marginalia.nu`) | independent web index, no key |
 | Wikipedia | official public API (`/w/api.php`) | no key, designed for this |
 | Stack Overflow | official public API (`api.stackexchange.com`) | no key, 300 req/day/IP |
 | Hacker News | official Algolia public API | no key, designed for this |
+
+The SearXNG entry makes this a metasearcher over a metasearcher: one of the
+fanned-out engines is itself a fan-out. Duplicates between the layers are
+dropped by the same URL-dedup, and the `duplicatesDropped` counter shows it
+working.
 
 Deliberately **not** wired in, because they return bot-challenge pages (or
 redirect walls) to a plain fetch from a server IP as of 2026-10: DuckDuckGo

@@ -160,6 +160,19 @@ def search_wikipedia(query):
     return out
 
 
+def search_searxng(query):
+    """The local SearXNG instance — a metasearcher as an engine. Each hit
+    carries the upstream engine that produced it, shown in the badge."""
+    params = urllib.parse.urlencode({"q": query, "format": "json"})
+    data = json.loads(fetch("http://127.0.0.1:8888/search?" + params))
+    out = []
+    for hit in data.get("results", [])[:RESULTS_PER_ENGINE]:
+        upstream = hit.get("engine", "?")
+        out.append(Result(hit.get("title", "(untitled)"), hit.get("url", ""),
+                          hit.get("content", ""), "searxng·" + upstream))
+    return out
+
+
 def search_marginalia(query):
     data = json.loads(fetch(
         "https://api.marginalia.nu/public/search/" + urllib.parse.quote(query) + "/"))
@@ -199,6 +212,7 @@ def search_hn(query):
 
 ENGINES = [
     ("bing", search_bing, "web"),
+    ("searxng", search_searxng, "metasearch"),
     ("marginalia", search_marginalia, "web"),
     ("wikipedia", search_wikipedia, "reference"),
     ("stackexchange", search_stackexchange, "q&a"),
@@ -334,6 +348,7 @@ PAGE = """<!DOCTYPE html>
 
 ENGINE_BLURBS = {
     "bing": "live HTML scrape — the one engine we beg for forgiveness",
+    "searxng": "the local SearXNG instance — dozens of engines behind one API",
     "marginalia": "independent non-profit web index",
     "wikipedia": "official API, no key",
     "stackexchange": "Stack Overflow, official API, no key",
@@ -356,8 +371,8 @@ def render(data):
         body = (
             "<div class='chips' style='margin-top:1.2rem'>"
             "<span class='try'>try</span>%s</div>"
-            "<h4>Five engines fanned out on every query</h4>"
-            "<div class='engines'>%s</div>" % (tries, engcards))
+            "<h4>%d engines fanned out on every query</h4>"
+            "<div class='engines'>%s</div>" % (tries, len(ENGINES), engcards))
     else:
         chips = "".join(
             "<span class='chip'>%s · %s · %dms</span>" % (
