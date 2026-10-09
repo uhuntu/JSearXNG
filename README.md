@@ -1,9 +1,11 @@
-# FIND engine
+# JSearXNG
 
-A real metasearcher: one query, fanned out concurrently to engines that
-actually still answer in 2026, scraped/parsed, deduplicated by URL, presented
-on one page. The direct descendant of the 2002 JSearch applet in the
-neighbouring `JSearch/` archive — same architecture, live world.
+A real metasearcher. The name is the architecture: **JSearch**, the 2002
+applet archived in the neighbouring repository, supplies the skeleton —
+fan-out, scrape, deduplicate, show every engine's failure honestly — and
+**SearXNG**, the local instance, supplies a community-maintained engine pool
+behind one JSON call. Same idea the 2002 author had, in a world that fights
+back.
 
 Single file (`find.py`), Python standard library only, no dependencies.
 
@@ -16,8 +18,8 @@ python3 find.py            # http://127.0.0.1:8092/
 A systemd user unit keeps it running and starts it at boot:
 
 ```sh
-systemctl --user status findengine     # running on 127.0.0.1:8092
-journalctl --user -u findengine -f     # logs
+systemctl --user status jsearxng      # running on 127.0.0.1:8092
+journalctl --user -u jsearxng -f      # logs
 loginctl show-user $USER -p Linger     # Linger=yes = starts at boot
 ```
 

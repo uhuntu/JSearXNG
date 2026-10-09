@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""FIND engine — a real metasearcher.
+"""JSearXNG — a real metasearcher.
 
-The 2002 ancestor (JSearch) fanned one query out to several engines, scraped
-the HTML, and deduplicated by URL. This does the same, against engines that
-actually still answer in 2026: one scraped (Bing) and two with official
-public APIs (Wikipedia, Hacker News). DuckDuckGo, Google and Mojeek all
-return bot-challenge pages to a plain fetch from a server IP, so they are
-not wired in — see README.md.
+The name is the pedigree: JSearch, the 2002 applet archived next door, fanned
+one query out to several engines, scraped the HTML, and deduplicated by URL.
+This does the same against a live 2026 web — its own engines plus the local
+SearXNG instance, whose engine pool sits behind one JSON call.
 
 Single file, standard library only. Run:
 
-    python3 find.py [--port 8091]
+    python3 find.py [--port 8092]
 
-Then open http://127.0.0.1:8091/
+Then open http://127.0.0.1:8092/
 """
 
 import argparse
@@ -291,7 +289,7 @@ def run_search(query):
 PAGE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FIND · %(query)s</title>
+<title>JSearXNG · %(query)s</title>
 <style>
   :root { --bg:#0a0f1d; --card:#11192d; --line:#1e2a44; --text:#dbe4f5;
           --muted:#7c8db0; --accent:#4f7cff; --ok:#34d399; --bad:#f87171; }
@@ -330,8 +328,8 @@ PAGE = """<!DOCTYPE html>
            border-radius:99px; padding:.05rem .5rem; }
   footer { color:var(--muted); font-size:.75rem; margin-top:2.5rem; line-height:1.6; }
 </style></head><body><main>
-<h1><a href="/">F<b>·</b>IND</a></h1>
-<p class="tag">turns search engines into FIND engines — for real, this time.</p>
+<h1><a href="/">J<b>·</b>SearXNG</a></h1>
+<p class="tag">JSearch × SearXNG — turns search engines into FIND engines, for real, this time.</p>
 <form action="/" method="get">
   <input type="search" name="q" value="%(query)s" placeholder="search the live web…" autofocus>
   <button>find</button>
@@ -439,7 +437,7 @@ def main():
     ap.add_argument("--port", type=int, default=8092)
     args = ap.parse_args()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print("FIND engine on http://127.0.0.1:%d/  (%s, live)"
+    print("JSearXNG on http://127.0.0.1:%d/  (%s, live)"
           % (args.port, " + ".join(name for name, _fn, _k in ENGINES)))
     server.serve_forever()
 
