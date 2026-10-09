@@ -482,7 +482,7 @@ public class JSearXNG {
         <div class="listbox">${rows}</div>
       </div>
       <div class="smalltabs"><span class="smalltab">&gt;&gt;预览</span></div>
-      <div class="prevbox">${preview}</div>
+      <div class="prevbox" id="preview">${preview}</div>
       <div class="smalltabs"><span class="smalltab">&gt;&gt;消息</span></div>
       <div class="msgbox">${message}</div>
     </div>
@@ -510,6 +510,23 @@ public class JSearXNG {
     </div>
   </div></form>
 </div>
+<script>
+// the 2002 interaction: single click a row to preview it, double click to open
+(function () {
+  var prev = document.getElementById('preview');
+  var rows = document.querySelectorAll('.rrow');
+  rows.forEach(function (r) {
+    r.addEventListener('click', function () {
+      prev.innerHTML = '<b>结果 ' + r.dataset.n + ' · ' + r.dataset.title + '</b><br>'
+          + (r.dataset.snippet || '(无摘要)') + '<br>'
+          + '<span style="color:#123a6e">' + r.dataset.url + '</span>';
+    });
+    r.addEventListener('dblclick', function () {
+      window.open(r.dataset.url, '_blank');
+    });
+  });
+})();
+</script>
 </body></html>""";
 
     /** The 2002 result-row columns: pad then clip, like formatString(). */
@@ -521,7 +538,7 @@ public class JSearXNG {
     static String esc(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                .replace("\"", "&quot;");
+                .replace("\"", "&quot;").replace("'", "&#39;");
     }
 
     static String jsonEsc(String s) {
@@ -574,10 +591,15 @@ public class JSearXNG {
         String rows = "", total = "0", preview;
         if (!data.results().isEmpty()) {
             StringBuilder r = new StringBuilder();
+            int n = 0;
             for (Result res : data.results()) {
-                r.append("<div><a href='").append(esc(res.url()))
-                 .append("' rel='noopener'>").append(fmt(res.title(), 42))
-                 .append("</a> | ").append(fmt(res.url(), 40))
+                n++;
+                r.append("<div class='rrow' data-n='").append(n)
+                 .append("' data-title='").append(esc(res.title()))
+                 .append("' data-snippet='").append(esc(res.snippet() == null ? "" : res.snippet()))
+                 .append("' data-url='").append(esc(res.url()))
+                 .append("'>").append(fmt(res.title(), 42))
+                 .append(" | ").append(fmt(res.url(), 40))
                  .append(" | from: ").append(esc(res.engine())).append("</div>");
             }
             rows = r.toString();
@@ -585,7 +607,7 @@ public class JSearXNG {
             Result top = data.results().get(0);
             String snip = top.snippet() == null || top.snippet().isEmpty()
                     ? "(无摘要)" : esc(top.snippet());
-            preview = "<b>预览一：" + esc(top.title()) + "</b><br>" + snip
+            preview = "<b>结果 1 · " + esc(top.title()) + "</b><br>" + snip
                     + "<br><span style='color:#123a6e'>" + esc(top.url()) + "</span>";
         } else {
             preview = query.isEmpty()
