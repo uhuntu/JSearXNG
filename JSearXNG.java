@@ -82,8 +82,24 @@ public class JSearXNG {
                 .timeout(FETCH_TIMEOUT)
                 .GET()
                 .build();
-        return HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                .body();
+        HttpResponse<String> response =
+                HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (response.statusCode() >= 300) {
+            throw new IllegalStateException("HTTP " + response.statusCode() + " from " + url);
+        }
+        return response.body();
+    }
+
+    /** API engines call this instead of Json.parse, so an HTML error page or
+     * challenge (rate-limit, 502, bot wall) reports what it is, not an
+     * opaque offset-0 parse failure. */
+    static Object parseJson(String body) {
+        String t = body == null ? "" : body.trim();
+        if (t.isEmpty() || (t.charAt(0) != '{' && t.charAt(0) != '[')) {
+            throw new IllegalStateException("response was not JSON (starts with \""
+                    + t.substring(0, Math.min(t.length(), 60)) + "\")");
+        }
+        return Json.parse(t);
     }
 
     static String urlEncode(String s) {
@@ -201,7 +217,7 @@ public class JSearXNG {
     static List<Result> searchSearxng(String query) throws Exception {
         // The local SearXNG instance — a metasearcher as an engine. Each hit
         // carries the upstream engine that produced it, shown in the badge.
-        Map<?, ?> data = (Map<?, ?>) Json.parse(fetch(
+        Map<?, ?> data = (Map<?, ?>) parseJson(fetch(
                 "http://127.0.0.1:8888/search?q=" + urlEncode(query) + "&format=json"));
         List<Result> out = new ArrayList<>();
         for (Object o : (List<?>) get(data, "results", List.of())) {
@@ -215,7 +231,7 @@ public class JSearXNG {
     }
 
     static List<Result> searchMarginalia(String query) throws Exception {
-        Map<?, ?> data = (Map<?, ?>) Json.parse(fetch(
+        Map<?, ?> data = (Map<?, ?>) parseJson(fetch(
                 "https://api.marginalia.nu/public/search/" + urlEncode(query) + "/"));
         List<Result> out = new ArrayList<>();
         for (Object o : (List<?>) get(data, "results", List.of())) {
@@ -228,7 +244,7 @@ public class JSearXNG {
     }
 
     static List<Result> searchWikipedia(String query) throws Exception {
-        Map<?, ?> data = (Map<?, ?>) Json.parse(fetch(
+        Map<?, ?> data = (Map<?, ?>) parseJson(fetch(
                 "https://en.wikipedia.org/w/api.php?action=query&list=search&format=json"
                         + "&srlimit=" + RESULTS_PER_ENGINE + "&srsearch=" + urlEncode(query)));
         Map<?, ?> q = (Map<?, ?>) get(data, "query", Map.of());
@@ -244,7 +260,7 @@ public class JSearXNG {
     }
 
     static List<Result> searchStackexchange(String query) throws Exception {
-        Map<?, ?> data = (Map<?, ?>) Json.parse(fetch(
+        Map<?, ?> data = (Map<?, ?>) parseJson(fetch(
                 "https://api.stackexchange.com/2.3/search/advanced?site=stackoverflow"
                         + "&pagesize=" + RESULTS_PER_ENGINE + "&q=" + urlEncode(query)));
         List<Result> out = new ArrayList<>();
@@ -267,7 +283,7 @@ public class JSearXNG {
     }
 
     static List<Result> searchHn(String query) throws Exception {
-        Map<?, ?> data = (Map<?, ?>) Json.parse(fetch(
+        Map<?, ?> data = (Map<?, ?>) parseJson(fetch(
                 "https://hn.algolia.com/api/v1/search?hitsPerPage=" + RESULTS_PER_ENGINE
                         + "&query=" + urlEncode(query)));
         List<Result> out = new ArrayList<>();
