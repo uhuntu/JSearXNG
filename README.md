@@ -2,11 +2,12 @@
 
 A real metasearcher, **in Java** — the J is earned, not inherited. The name is
 the architecture: **JSearch**, the 2002 Java applet archived in the
-neighbouring repository, supplies the skeleton — fan-out, scrape, deduplicate,
-show every engine's failure honestly — and **SearXNG**, the local instance,
-supplies a community-maintained engine pool behind one JSON call. Same idea
-the 2002 author had, in a world that fights back, and the 2002 applet UI is
-reborn as the face.
+neighbouring [JSearch](https://github.com/uhuntu/JSearch) repository, supplies
+the skeleton — fan-out, scrape, deduplicate, show every engine's failure
+honestly — and **SearXNG**, the local instance, supplies a
+community-maintained engine pool behind one JSON call. Same idea the 2002
+author had, in a world that fights back, and the 2002 applet UI is reborn as
+the face.
 
 Single file (`JSearXNG.java`), JDK standard library only — `java.net.http`,
 `com.sun.net.httpserver`, `java.util.concurrent` — no build step: the source
@@ -79,3 +80,8 @@ error,ms}], durationMs, duplicatesDropped}`.
 
 Write `def search_x(query) -> list[Result]`, add it to `ENGINES`. If it dies,
 its exception becomes that engine's chip text — by construction.
+
+## License
+
+GPL-2.0-or-later — the same terms as the archive it descends from; the
+embedded JSON reader comes from `modern/` under those terms.
