@@ -1,16 +1,20 @@
 # JSearXNG
 
-A real metasearcher. The name is the architecture: **JSearch**, the 2002
-applet archived in the neighbouring repository, supplies the skeleton —
-fan-out, scrape, deduplicate, show every engine's failure honestly — and
-**SearXNG**, the local instance, supplies a community-maintained engine pool
-behind one JSON call. Same idea the 2002 author had, in a world that fights
-back.
+A real metasearcher, **in Java** — the J is earned, not inherited. The name is
+the architecture: **JSearch**, the 2002 Java applet archived in the
+neighbouring repository, supplies the skeleton — fan-out, scrape, deduplicate,
+show every engine's failure honestly — and **SearXNG**, the local instance,
+supplies a community-maintained engine pool behind one JSON call. Same idea
+the 2002 author had, in a world that fights back, and the 2002 applet UI is
+reborn as the face.
 
-Single file (`find.py`), Python standard library only, no dependencies.
+Single file (`JSearXNG.java`), JDK standard library only — `java.net.http`,
+`com.sun.net.httpserver`, `java.util.concurrent` — no build step: the source
+is executed directly. The JSON reader inside is copied from the teaching
+sketch (`JSearch/modern/`), which is the lineage helping its own descendant.
 
 ```sh
-python3 find.py            # http://127.0.0.1:8092/
+java JSearXNG.java         # http://127.0.0.1:8092/
 ```
 
 ## Service
