@@ -116,9 +116,22 @@ public class JSearXNG {
 
     static String unescape(String s) {
         if (s == null) return "";
+        // numeric entities first (&#0183; / &#xB7;), then the named few —
+        // the Python parser converted all of these automatically
+        StringBuffer out = new StringBuffer();
+        Matcher num = Pattern.compile("&#(\\d+);|&#x([0-9a-fA-F]+);").matcher(s);
+        while (num.find()) {
+            int code = num.group(1) != null
+                    ? Integer.parseInt(num.group(1))
+                    : Integer.parseInt(num.group(2), 16);
+            num.appendReplacement(out,
+                    Matcher.quoteReplacement(code == 0 ? "" : String.valueOf((char) code)));
+        }
+        num.appendTail(out);
+        s = out.toString();
         return s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
                 .replace("&quot;", "\"").replace("&#39;", "'")
-                .replace("&nbsp;", " ").replace("&#160;", " ").replace("&#183;", "·");
+                .replace("&nbsp;", " ").replace("&#160;", " ").replace("&middot;", "·");
     }
 
     static String unwrapBing(String href) {
@@ -254,7 +267,8 @@ public class JSearXNG {
             String title = str(hit.get("title"), "");
             String url = "https://en.wikipedia.org/wiki/"
                     + URLEncoder.encode(title.replace(' ', '_'), StandardCharsets.UTF_8);
-            out.add(new Result(title, url, stripTags(str(hit.get("snippet"), "")), "wikipedia"));
+            out.add(new Result(title, url,
+                    unescape(stripTags(str(hit.get("snippet"), ""))), "wikipedia"));
         }
         return out;
     }
