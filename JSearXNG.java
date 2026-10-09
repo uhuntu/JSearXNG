@@ -173,7 +173,9 @@ public class JSearXNG {
             } else if (!closing && tag.equals("a")) {
                 Matcher hrefAttr = Pattern.compile("href\\s*=\\s*\"([^\"]*)\"").matcher(attrs);
                 if (hrefAttr.find()) {
-                    String h = hrefAttr.group(1);
+                    // attribute values are &-escaped in the raw HTML; the Python
+                    // parser unescaped them for us, here we do it by hand
+                    String h = unescape(hrefAttr.group(1));
                     // the title lives in the block's <h2>; any earlier http anchor
                     // (Bing puts the site name in one) is only a fallback
                     if (h.startsWith("http") && (inH2 > 0 || href == null)) {
@@ -186,10 +188,10 @@ public class JSearXNG {
                 capture = "snippet";
                 buf.setLength(0);
             } else if (closing && tag.equals("a") && "title".equals(capture)) {
-                title = buf.toString().trim();
+                title = unescape(buf.toString().trim());
                 capture = null;
             } else if (closing && tag.equals("p") && "snippet".equals(capture)) {
-                snip = buf.toString();
+                snip = unescape(buf.toString());
                 capture = null;
             }
         }
