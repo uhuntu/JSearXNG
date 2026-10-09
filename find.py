@@ -240,8 +240,10 @@ def sanity_ok(query, hits):
     return False
 
 
-def run_search(query):
+def run_search(query, engines=None, speed=None, levels=None):
     t0 = time.time()
+    chosen = [e for e in ENGINES if not engines or e[0] in engines] or ENGINES
+    levels = max(1, min(int(levels or RESULTS_PER_ENGINE), 16))
 
     def one(entry):
         name, fn, _kind = entry
@@ -250,14 +252,16 @@ def run_search(query):
             hits = fn(query)
         except Exception as exc:  # per-engine failure is data, not a crash
             return (name, [], "%s: %s" % (type(exc).__name__, exc), time.time() - start)
+        hits = hits[:levels]  # smlCh — how deep one engine may go
         if not sanity_ok(query, hits):
             return (name, [],
                     "response failed the relevance check (query terms absent) — likely a bot-block page",
                     time.time() - start)
         return (name, hits, None, time.time() - start)
 
-    with ThreadPoolExecutor(max_workers=len(ENGINES)) as pool:
-        outcomes = list(pool.map(one, ENGINES))
+    # smsCh — the 2002 "search max speed": cap simultaneous connections
+    with ThreadPoolExecutor(max_workers=max(1, min(int(speed or len(chosen)), 8))) as pool:
+        outcomes = list(pool.map(one, chosen))
 
     seen, results = set(), []
     for _name, hits, _err, _ms in outcomes:
@@ -287,121 +291,162 @@ def run_search(query):
 # --------------------------------------------------------------------------
 
 PAGE = """<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JSearXNG · %(query)s</title>
 <style>
-  :root { --bg:#0a0f1d; --card:#11192d; --line:#1e2a44; --text:#dbe4f5;
-          --muted:#7c8db0; --accent:#4f7cff; --ok:#34d399; --bad:#f87171; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text);
-         font:16px/1.5 system-ui, sans-serif; }
-  main { max-width:760px; margin:0 auto; padding:2rem 1rem 4rem; }
-  h1 a { color:var(--text); text-decoration:none; font-size:1.6rem; }
-  h1 a b { color:var(--accent); }
-  .tag { color:var(--muted); font-size:.85rem; margin:.2rem 0 1.5rem; }
-  form { display:flex; gap:.5rem; }
-  input[type=search] { flex:1; padding:.7rem 1rem; font-size:1rem; color:var(--text);
-    background:var(--card); border:1px solid var(--line); border-radius:10px; }
-  button { padding:.7rem 1.2rem; font-size:1rem; color:#fff; background:var(--accent);
-    border:0; border-radius:10px; cursor:pointer; }
-  .chips { margin:1rem 0; display:flex; flex-wrap:wrap; gap:.4rem; font-size:.78rem; }
-  .chip { border:1px solid var(--line); border-radius:99px; padding:.15rem .6rem;
-          color:var(--muted); }
-  .chip b { color:var(--ok); } .chip i { color:var(--bad); font-style:normal; }
-  a.chip { text-decoration:none; cursor:pointer; }
-  a.chip:hover { border-color:var(--accent); color:var(--accent); }
-  .try { color:var(--muted); font-size:.78rem; align-self:center; }
-  h4 { margin:1.8rem 0 .3rem; font-size:.95rem; }
-  .engines { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.5rem; }
-  .eng { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:.6rem .8rem; }
-  .eng b { color:var(--text); font-size:.9rem; }
-  .eng span { display:block; color:var(--muted); font-size:.75rem; margin-top:.15rem; }
-  .meta { color:var(--muted); font-size:.8rem; margin-bottom:1rem; }
-  article { background:var(--card); border:1px solid var(--line); border-radius:10px;
-            padding:.9rem 1rem; margin-bottom:.6rem; }
-  article a { color:var(--text); font-weight:600; text-decoration:none; font-size:1.02rem; }
-  article a:hover { color:var(--accent); }
-  .u { color:var(--muted); font-size:.75rem; word-break:break-all; margin:.15rem 0; }
-  .s { font-size:.85rem; color:#b9c5dd; margin:0; }
-  .badge { float:right; font-size:.7rem; color:var(--accent); border:1px solid var(--accent);
-           border-radius:99px; padding:.05rem .5rem; }
-  footer { color:var(--muted); font-size:.75rem; margin-top:2.5rem; line-height:1.6; }
-</style></head><body><main>
-<h1><a href="/">J<b>·</b>SearXNG</a></h1>
-<p class="tag">JSearch × SearXNG — turns search engines into FIND engines, for real, this time.</p>
-<form action="/" method="get">
-  <input type="search" name="q" value="%(query)s" placeholder="search the live web…" autofocus>
-  <button>find</button>
-</form>
-%(body)s
-<footer>
-  Live fan-out to %(engine_list)s. One scraped engine, the rest official
-  public APIs; deduplicated by URL. No result cache, no tracking, no ads.
-  Engines that refuse the fetch — or answer with poisoned filler — report
-  here instead of vanishing.
-</footer>
-</main></body></html>"""
+  body { margin:0; padding:10px; background:#3a6ea5; color:#000;
+         font:13px/1.4 Tahoma, Verdana, sans-serif; }
+  .frame { border:2px solid #fff; outline:1px solid #0b2545; background:#7ba7d7; padding:6px; }
+  .tabbar { display:flex; gap:2px; margin-bottom:4px; }
+  .tab { background:#d6e4f5; border:1px solid #0b2545; border-bottom:none;
+         padding:2px 16px; font-weight:bold; color:#0b3d6e; }
+  .cols { display:flex; gap:6px; align-items:flex-start; }
+  .left { flex:1 1 auto; min-width:0; }
+  .right { flex:0 0 210px; }
+  .panel { background:#7fffff; border:2px solid #0b3d6e; padding:6px; margin-bottom:6px; }
+  .panel h3 { margin:-6px -6px 6px; background:#9fd0ff; border-bottom:1px solid #0b3d6e;
+              padding:2px 6px; font-size:13px; color:#0b3d6e; }
+  .querybox { width:99%%; font:13px Tahoma, sans-serif; padding:2px 4px;
+              border:2px inset #7ba7d7; background:#fff; }
+  .btn { font:13px Tahoma, sans-serif; padding:2px 14px; margin:6px 4px 0 0;
+         background:#d6e4f5; border:2px outset #d6e4f5; cursor:pointer; color:#000;
+         text-decoration:none; display:inline-block; }
+  .btn[disabled] { color:#666; border-style:inset; cursor:default; }
+  .hint { color:#123a6e; font-size:12px; margin:4px 0 0; }
+  .listbox { background:#fff; border:2px inset #7ba7d7; height:230px; overflow:auto;
+             padding:2px; font:12px/1.8 "Courier New", monospace; white-space:nowrap; }
+  .listbox a { color:#000; text-decoration:none; }
+  .listbox a:hover { background:#0b3d6e; color:#fff; }
+  .smalltabs { display:flex; gap:2px; margin:6px 0 3px; }
+  .smalltab { background:#9fd0ff; border:1px solid #0b3d6e; border-bottom:none;
+              padding:1px 8px; font-size:12px; font-weight:bold; color:#0b3d6e; }
+  .prevbox { background:#7fffff; border:2px solid #0b3d6e; padding:6px;
+             font:12px/1.5 Tahoma, sans-serif; max-height:8em; overflow:auto; }
+  .msgbox { background:#fff; border:2px inset #7ba7d7; padding:4px 6px;
+            font:12px/1.6 "Courier New", monospace; white-space:pre-wrap; }
+  .total { font-size:12px; color:#0b3d6e; margin:2px 0; }
+  .cat { list-style:none; margin:0; padding:2px 4px; background:#fff;
+         border:2px inset #7ba7d7; font-size:12px; }
+  .cblist { background:#fff; border:2px inset #7ba7d7; padding:3px 5px; font-size:12px; }
+  .cblist label { display:block; padding:1px 0; }
+  select { font:12px Tahoma, sans-serif; width:190px; border:2px inset #7ba7d7; }
+  .opt { font-size:12px; }
+  .about { font-size:11px; color:#123a6e; line-height:1.5; }
+</style></head><body>
+<div class="frame">
+  <div class="tabbar"><span class="tab">搜索</span></div>
+  <form action="/" method="get"><div class="cols">
+    <div class="left">
+      <div class="panel">
+        <h3>查询内容</h3>
+        <input class="querybox" type="search" name="q" value="%(query)s" autofocus>
+        <div class="hint">搜索条件依所选搜索引擎而定。</div>
+        <button class="btn" type="submit">开始搜索</button><a class="btn" disabled title="服务器一次一查，无可停止">停止搜索</a><a class="btn" href="/">新建搜索</a>
+      </div>
+      <div class="panel">
+        <h3>结果</h3>
+        <div class="total">总计: %(total)s</div>
+        <div class="listbox">%(rows)s</div>
+      </div>
+      <div class="smalltabs"><span class="smalltab">&gt;&gt;预览</span></div>
+      <div class="prevbox">%(preview)s</div>
+      <div class="smalltabs"><span class="smalltab">&gt;&gt;消息</span></div>
+      <div class="msgbox">%(message)s</div>
+    </div>
+    <div class="right">
+      <div class="panel">
+        <h3>引擎</h3>
+        <div class="smalltabs" style="margin:0 0 3px"><span class="smalltab">类别</span></div>
+        %(kinds)s
+        <div class="smalltabs" style="margin:6px 0 3px"><span class="smalltab">搜索引擎</span></div>
+        <div class="cblist">%(engine_checks)s</div>
+      </div>
+      <div class="panel">
+        <h3>选项</h3>
+        <div class="opt">搜索最大速度 smsCh</div>
+        <select name="speed">%(speed_opts)s</select>
+        <div class="opt" style="margin-top:4px">搜索最大层级 smlCh</div>
+        <select name="levels">%(level_opts)s</select>
+      </div>
+      <div class="panel about">
+        <h3>关于</h3>
+        J·SearXNG — JSearch 的骨架（2002：扇出、抓取、按 URL 去重、每个引擎如实报告），
+        SearXNG 的引擎池。无缓存、无追踪、无广告，单文件零依赖；每次查询每引擎一个请求。
+        smsCh 限并发连接数，smlCh 限单引擎深度——和 2002 年同名参数一个意思。
+      </div>
+    </div>
+  </div></form>
+</div>
+</body></html>"""
 
 
-ENGINE_BLURBS = {
-    "bing": "live HTML scrape — the one engine we beg for forgiveness",
-    "searxng": "the local SearXNG instance — dozens of engines behind one API",
-    "marginalia": "independent non-profit web index",
-    "wikipedia": "official API, no key",
-    "stackexchange": "Stack Overflow, official API, no key",
-    "hn": "Hacker News via the Algolia API",
-}
+def _fmt(s, n):
+    """The 2002 result-row columns: pad then clip, like formatString()."""
+    return html.escape((s or "")[:n].ljust(n))
 
 
 def render(data):
+    form = data.get("form", {})
     query = data["query"]
-    if not query:
-        tries = "".join(
-            "<a class='chip' href='/?q=%s'>%s</a>" % (urllib.parse.quote(t), t)
-            for t in ["searxng", "java applet 2002", "marginalia",
-                      "shanghai", "tiny house"])
-        engcards = "".join(
-            "<div class='eng'><b>%s</b><span>%s · %s</span></div>" % (
-                html.escape(name), html.escape(kind),
-                html.escape(ENGINE_BLURBS.get(name, "")))
-            for name, _fn, kind in ENGINES)
-        body = (
-            "<div class='chips' style='margin-top:1.2rem'>"
-            "<span class='try'>try</span>%s</div>"
-            "<h4>%d engines fanned out on every query</h4>"
-            "<div class='engines'>%s</div>" % (tries, len(ENGINES), engcards))
+    chosen = set(form.get("engines") or [])
+
+    checks = "".join(
+        "<label><input type='checkbox' name='engines' value='%s'%s> %s</label>" % (
+            name, " checked" if not chosen or name in chosen else "", name)
+        for name, _fn, _kind in ENGINES)
+    kinds = "<ul class='cat'>%s</ul>" % "".join(
+        "<li>%s</li>" % html.escape(k) for k in sorted({k for _n, _f, k in ENGINES}))
+    speed_now = form.get("speed", 4)
+    level_now = form.get("levels", 8)
+    speed_opts = "".join("<option%s>%d</option>" % (" selected" if v == speed_now else "", v)
+                         for v in range(1, 9))
+    level_opts = "".join("<option%s>%d</option>" % (" selected" if v == level_now else "", v)
+                         for v in range(1, 17))
+
+    if data["results"]:
+        rows = "".join(
+            "<div><a href='%s' rel='noopener'>%s</a> | %s | from: %s</div>" % (
+                html.escape(r["url"], quote=True),
+                _fmt(r["title"], 42), _fmt(r["url"], 40),
+                html.escape(r["engine"]))
+            for r in data["results"])
+        total = str(len(data["results"]))
+        top = data["results"][0]
+        preview = "<b>预览一：%s</b><br>%s<br><span style='color:#123a6e'>%s</span>" % (
+            html.escape(top["title"]),
+            html.escape(top["snippet"]) or "(无摘要)",
+            html.escape(top["url"]))
     else:
-        chips = "".join(
-            "<span class='chip'>%s · %s · %dms</span>" % (
-                e["engine"],
-                ("<b>%d result%s</b>" % (e["count"], "s" if e["count"] != 1 else ""))
-                if not e["error"] else "<i>%s</i>" % e["error"],
-                e["ms"])
-            for e in data["engines"])
-        if data["results"]:
-            items = "".join(
-                "<article><span class='badge'>%s</span>"
-                "<a href='%s' rel='noopener'>%s</a>"
-                "<div class='u'>%s</div><p class='s'>%s</p></article>" % (
-                    html.escape(r["engine"]), html.escape(r["url"], quote=True),
-                    html.escape(r["title"]), html.escape(r["url"]),
-                    html.escape(r["snippet"]))
-                for r in data["results"])
-            body = (
-                "<div class='chips'>%s</div>"
-                "<p class='meta'>%d results · %d duplicates dropped · %d ms</p>%s"
-                % (chips, len(data["results"]), data["duplicatesDropped"],
-                   data["durationMs"], items))
-        else:
-            body = ("<div class='chips'>%s</div>"
-                    "<p class='meta'>No results — every engine failed or came back empty.</p>%s"
-                    % (chips, "".join("<span class='chip'><i>%s</i></span>" % e["error"]
-                                      for e in data["engines"] if e["error"])))
+        rows = ""
+        total = "0"
+        preview = ("输入查询，按“开始搜索”。" if not query
+                   else "（无结果可供预览——见 >>消息）")
+
+    if data["engines"]:
+        lines = []
+        for e in data["engines"]:
+            if e["error"]:
+                lines.append("[%s] %s" % (e["engine"], e["error"]))
+            else:
+                lines.append("[%s] %d results, %d ms" % (e["engine"], e["count"], e["ms"]))
+        lines.append("[jsearxng] 共 %d 条结果，去重丢弃 %d 条，耗时 %d ms"
+                     % (len(data["results"]), data["duplicatesDropped"], data["durationMs"]))
+        message = html.escape("\n".join(lines))
+    else:
+        message = ("[jsearxng] 准备就绪。六个引擎整装待发：bing 会投毒，我们体检；"
+                   "其余走官方 API。勾选引擎、调好 smsCh/smlCh，按“开始搜索”。")
+
     return PAGE % {
         "query": html.escape(query),
-        "body": body,
-        "engine_list": ", ".join(name for name, _fn, _k in ENGINES),
+        "total": total,
+        "rows": rows,
+        "preview": preview,
+        "message": message,
+        "kinds": kinds,
+        "engine_checks": checks,
+        "speed_opts": speed_opts,
+        "level_opts": level_opts,
     }
 
 
@@ -410,9 +455,13 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
         query = (params.get("q", [""])[0] or "").strip()
+        engines = [e for e in (params.get("engines", [""])[0] or "").split(",") if e]
+        speed = params.get("speed", [None])[0]
+        levels = params.get("levels", [None])[0]
 
         if parsed.path == "/api/search":
-            data = run_search(query) if query else {"error": "missing q"}
+            data = (run_search(query, engines=engines, speed=speed, levels=levels)
+                    if query else {"error": "missing q"})
             payload = json.dumps(data, ensure_ascii=False).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -420,8 +469,15 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
-        data = run_search(query) if query else {"query": "", "engines": [], "results": [],
-                                                "duplicatesDropped": 0, "durationMs": 0}
+        data = (run_search(query, engines=engines, speed=speed, levels=levels)
+                if query else
+                {"query": "", "engines": [], "results": [],
+                 "duplicatesDropped": 0, "durationMs": 0})
+        data["form"] = {
+            "engines": engines,
+            "speed": int(speed) if speed else 4,
+            "levels": int(levels) if levels else 8,
+        }
         page = render(data).encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
