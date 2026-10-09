@@ -597,17 +597,23 @@ public class JSearXNG {
     // HTTP server
     // ------------------------------------------------------------------
 
-    static Map<String, String> parseParams(String rawQuery) {
-        Map<String, String> params = new LinkedHashMap<>();
+    /** Repeated keys (checkbox arrays) must survive: one name, many values. */
+    static Map<String, List<String>> parseParams(String rawQuery) {
+        Map<String, List<String>> params = new LinkedHashMap<>();
         if (rawQuery == null || rawQuery.isEmpty()) return params;
         for (String pair : rawQuery.split("&")) {
             int eq = pair.indexOf('=');
-            String key = eq < 0 ? pair : pair.substring(0, eq);
-            String value = eq < 0 ? "" : pair.substring(eq + 1);
-            params.putIfAbsent(URLDecoder.decode(key, StandardCharsets.UTF_8),
-                    URLDecoder.decode(value, StandardCharsets.UTF_8));
+            String key = URLDecoder.decode(eq < 0 ? pair : pair.substring(0, eq),
+                    StandardCharsets.UTF_8);
+            String value = URLDecoder.decode(eq < 0 ? "" : pair.substring(eq + 1),
+                    StandardCharsets.UTF_8);
+            params.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
         }
         return params;
+    }
+
+    static String first(List<String> values) {
+        return values == null || values.isEmpty() ? "" : values.get(0);
     }
 
     static void send(com.sun.net.httpserver.HttpExchange exchange, String contentType, byte[] body)
@@ -631,15 +637,20 @@ public class JSearXNG {
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/", exchange -> {
             try {
-                Map<String, String> params =
+                Map<String, List<String>> params =
                         parseParams(exchange.getRequestURI().getRawQuery());
-                String query = params.getOrDefault("q", "").trim();
+                String query = first(params.get("q")).trim();
                 Set<String> engines = new HashSet<>();
-                for (String e : params.getOrDefault("engines", "").split(",")) {
-                    if (!e.isBlank()) engines.add(e.trim());
+                for (String raw : params.getOrDefault("engines", List.of())) {
+                    // both form styles: repeated keys and comma-joined
+                    for (String e : raw.split(",")) {
+                        if (!e.isBlank()) engines.add(e.trim());
+                    }
                 }
-                Integer speed = params.get("speed") == null ? null : Integer.parseInt(params.get("speed"));
-                Integer levels = params.get("levels") == null ? null : Integer.parseInt(params.get("levels"));
+                Integer speed = params.containsKey("speed")
+                        ? Integer.parseInt(first(params.get("speed"))) : null;
+                Integer levels = params.containsKey("levels")
+                        ? Integer.parseInt(first(params.get("levels"))) : null;
 
                 if (exchange.getRequestURI().getPath().equals("/api/search")) {
                     if (query.isEmpty()) {
