@@ -124,14 +124,18 @@ public class JSearXNG {
             int code = num.group(1) != null
                     ? Integer.parseInt(num.group(1))
                     : Integer.parseInt(num.group(2), 16);
-            num.appendReplacement(out,
-                    Matcher.quoteReplacement(code == 0 ? "" : String.valueOf((char) code)));
+            // &#0; is a stray null. &#160; is the numeric spelling of &nbsp;
+            // and folds to a plain space like the named form below, so one
+            // entity cannot come out as two different characters depending on
+            // how the page spelled it.
+            String rep = code == 0 ? "" : code == 160 ? " " : String.valueOf((char) code);
+            num.appendReplacement(out, Matcher.quoteReplacement(rep));
         }
         num.appendTail(out);
         s = out.toString();
         return s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
                 .replace("&quot;", "\"").replace("&#39;", "'")
-                .replace("&nbsp;", " ").replace("&#160;", " ").replace("&middot;", "·");
+                .replace("&nbsp;", " ").replace("&middot;", "·");
     }
 
     static String unwrapBing(String href) {
@@ -529,7 +533,12 @@ public class JSearXNG {
 </script>
 </body></html>""";
 
-    /** The 2002 result-row columns: pad then clip, like formatString(). */
+    /** The template's slots, matched in one pass by render(). */
+    static final Pattern TOKEN = Pattern.compile(
+            "\\$\\{(query|total|rows|preview|message|kinds|engine_checks|speed_opts|level_opts)\\}");
+
+    /** The 2002 result-row columns: clip to a fixed width (formatString()'s
+     * truncation half — the monospace listbox supplies the alignment). */
     static String fmt(String s, int n) {
         String t = s == null ? "" : s;
         return esc(t.substring(0, Math.min(t.length(), n)));
@@ -633,16 +642,28 @@ public class JSearXNG {
                     + "其余走官方 API。勾选引擎、调好 smsCh/smlCh，按“开始搜索”。";
         }
 
-        return TEMPLATE
-                .replace("${query}", esc(query))
-                .replace("${total}", total)
-                .replace("${rows}", rows)
-                .replace("${preview}", preview)
-                .replace("${message}", message)
-                .replace("${kinds}", kindList.toString())
-                .replace("${engine_checks}", checks.toString())
-                .replace("${speed_opts}", speedOpts.toString())
-                .replace("${level_opts}", levelOpts.toString());
+        // One pass over the template, not a chain of replace() calls: a query
+        // or a result title containing the literal text "${message}" would
+        // otherwise be expanded by a later replace, landing one panel's content
+        // inside another panel's attribute. appendReplacement never re-scans
+        // what it inserted.
+        Map<String, String> slots = new LinkedHashMap<>();
+        slots.put("query", esc(query));
+        slots.put("total", total);
+        slots.put("rows", rows);
+        slots.put("preview", preview);
+        slots.put("message", message);
+        slots.put("kinds", kindList.toString());
+        slots.put("engine_checks", checks.toString());
+        slots.put("speed_opts", speedOpts.toString());
+        slots.put("level_opts", levelOpts.toString());
+        Matcher slot = TOKEN.matcher(TEMPLATE);
+        StringBuilder page = new StringBuilder();
+        while (slot.find()) {
+            slot.appendReplacement(page, Matcher.quoteReplacement(slots.get(slot.group(1))));
+        }
+        slot.appendTail(page);
+        return page.toString();
     }
 
     // ------------------------------------------------------------------
