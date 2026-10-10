@@ -29,6 +29,12 @@ journalctl --user -u jsearxng -f      # logs
 loginctl show-user $USER -p Linger     # Linger=yes = starts at boot
 ```
 
+After editing `JSearXNG.java`, ship it with `systemctl --user restart
+jsearxng`. Never start a second `java JSearXNG.java` by hand: the unit's
+next start dies on the occupied port and flaps in `activating
+(auto-restart)`, while the hand-started process gets none of what the unit
+provides — no boot start, no journal, no restart on failure.
+
 ## Engines
 
 | Engine | How | Notes |
