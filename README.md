@@ -9,10 +9,11 @@ community-maintained engine pool behind one JSON call. Same idea the 2002
 author had, in a world that fights back, and the 2002 applet UI is reborn as
 the face.
 
-Single file (`JSearXNG.java`), JDK standard library only — `java.net.http`,
-`com.sun.net.httpserver`, `java.util.concurrent` — no build step: the source
-is executed directly. The JSON reader inside is copied from the teaching
-sketch (`JSearch/modern/`), which is the lineage helping its own descendant.
+The app is one file (`JSearXNG.java`), JDK standard library only —
+`java.net.http`, `com.sun.net.httpserver`, `java.util.concurrent` — no build
+step: the source is executed directly. The JSON reader inside is copied from
+the teaching sketch (`JSearch/modern/`), which is the lineage helping its own
+descendant.
 
 ```sh
 java JSearXNG.java         # http://127.0.0.1:8092/
@@ -51,7 +52,7 @@ This was verified with real requests before writing the parsers, and is the
 same wall the archive's `README.md` predicted for its 2001-era engines.
 
 **Bing also poisons**: after a few requests it stops erroring and starts
-serving random popular pages instead of the asked-for results. `run_search`
+serving random popular pages instead of the asked-for results. `runSearch`
 runs a relevance sanity-check on every engine's response — if no result
 mentions any query term, the engine's slot shows
 `response failed the relevance check … likely a bot-block page` instead of
@@ -70,16 +71,36 @@ garbage results. Do not trust a scraped engine that returns "success".
 ## API
 
 ```sh
-curl 'http://127.0.0.1:8091/api/search?q=searxng'
+curl 'http://127.0.0.1:8092/api/search?q=searxng'
 ```
 
 Returns `{query, results[{title,url,snippet,engine}], engines[{engine,count,
 error,ms}], durationMs, duplicatesDropped}`.
 
+## Tests
+
+```sh
+./test.sh     # 117 checks, no network, exit 0 or 1
+```
+
+Every check is on a pure function — the entity layer, query parsing, URL dedup
+keys, the poison check, Bing redirect unwrapping, escaping, the JSON reader,
+the page render — so the suite needs no network, no fixtures and no clock. The
+network half is the live service itself, plus each engine's own error
+reporting in the `>>消息` pane.
+
+Several sections exist because a bug of exactly that shape already shipped and
+was found by eye: the repeated-form-key collapse (six `engines=` values
+becoming one), the `&amp;` that survived inside Bing tracking URLs, the raw
+`&#0183;` in a preview, and the template slot a query containing `${message}`
+could expand. The `&#160;` / `&nbsp;` inconsistency and the slot injection were
+both caught by this suite before it had a single user.
+
 ## Adding an engine
 
-Write `def search_x(query) -> list[Result]`, add it to `ENGINES`. If it dies,
-its exception becomes that engine's chip text — by construction.
+Write `static List<Result> searchX(String query) throws Exception`, add it to
+`ENGINES`. If it dies, its exception becomes that engine's chip text — by
+construction.
 
 ## License
 
